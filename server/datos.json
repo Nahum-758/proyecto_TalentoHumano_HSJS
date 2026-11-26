@@ -1,0 +1,36 @@
+{
+  "usuarios": [
+    {
+      "id": "admin-1",
+      "nombre": "Dirección / Admin",
+      "correo": "admin@empresa.com",
+      "password": "123",
+      "rol": "admin",
+      "puesto": "Administrador",
+      "fechaIngreso": "2022-01-10",
+      "vecesVacacionesAnio": 2,
+      "diasPorPeriodoVacaciones": 6,
+      "diasVacacionesUsados": 0,
+      "vigenciaVacaciones": "2026-12-31",
+      "permisosAnualesDerecho": 4,
+      "permisosUsados": 0
+    },
+    {
+      "id": "emp-1",
+      "nombre": "Empleado 1",
+      "correo": "emp1@empresa.com",
+      "password": "123",
+      "rol": "empleado",
+      "puesto": "Operativo",
+      "fechaIngreso": "2025-04-01",
+      "vecesVacacionesAnio": 2,
+      "diasPorPeriodoVacaciones": 6,
+      "diasVacacionesUsados": 0,
+      "vigenciaVacaciones": "2026-12-31",
+      "permisosAnualesDerecho": 4,
+      "permisosUsados": 0
+    }
+  ],
+  "solicitudes": [],
+  "incidencias": []
+}
