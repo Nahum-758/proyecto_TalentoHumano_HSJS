@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:talento_humano/src/core/hospital_theme.dart';
 import 'package:talento_humano/src/core/talento_humano_store.dart';
+import 'package:talento_humano/src/features/dashboard/presentacion/notificaciones_boton.dart';
 
 class EmployeeDashboard extends StatefulWidget {
   const EmployeeDashboard({super.key});
@@ -102,15 +103,10 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
         builder: (ctx, setModalState) {
           final tipoEfectivo = esVacacion ? 'Vacaciones' : tipoSeleccionado;
           final esFallec = _esFallecimiento(tipoEfectivo);
-          final maxPermitido = esVacacion
-              ? emp.diasVacacionesDisponibles
-              : (esFallec
-                  ? (emp.fallecimientoPrimeraLineaDisponibles < 3
-                      ? emp.fallecimientoPrimeraLineaDisponibles
-                      : 3)
-                  : null);
+          final int maxPermitido = emp.saldoDisponiblePara(tipoEfectivo);
 
-          String etiquetaCantidad = 'Cantidad (días o eventos)';
+          String etiquetaCantidad =
+              'Cantidad (días o eventos) (Disp: $maxPermitido)';
           if (esVacacion) {
             etiquetaCantidad =
                 'Días solicitados (Disp: ${emp.diasVacacionesDisponibles})';
@@ -249,6 +245,22 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 6),
+                    Builder(
+                      builder: (_) {
+                        final habiles = TalentoHumanoStore
+                            .instance.calendarioLaboral
+                            .diasHabilesEntre(fechaInicio, fechaFin);
+                        return Text(
+                          'Días hábiles en el rango: $habiles '
+                          '(sin fines de semana ni festivos)',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.black54,
+                          ),
+                        );
+                      },
+                    ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: motivoController,
@@ -284,7 +296,7 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
                     );
                     return;
                   }
-                  if (maxPermitido != null && parsed > maxPermitido) {
+                  if (parsed > maxPermitido) {
                     setModalState(
                       () => errorDias = maxPermitido <= 0
                           ? 'No tienes días disponibles para este concepto.'
@@ -404,6 +416,7 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
               ],
             ),
             actions: [
+              if (emp != null) NotificacionesBoton(idEmpleado: emp.id),
               IconButton(
                 tooltip: 'Sincronizar',
                 icon: store.cargando
@@ -492,7 +505,13 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
                   ),
                 ),
                 const SizedBox(height: 6),
+                if (emp.numeroEmpleado.isNotEmpty)
+                  Text('No. de empleado: ${emp.numeroEmpleado}'),
                 Text('Puesto: ${emp.puesto}'),
+                Text(
+                  'Departamento: ${store.nombreDepartamento(emp.departamentoId)}',
+                ),
+                Text('Estado laboral: ${emp.estadoLaboral.etiqueta}'),
                 Text('Antigüedad: ${emp.antiguedadTexto}'),
                 Text('Fecha de ingreso: ${_fmtFecha(emp.fechaIngreso)}'),
                 Text(
@@ -570,8 +589,37 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
           'Fallecimiento de primera línea',
           '${emp.fallecimientoPrimeraLineaDisponibles} / ${emp.fallecimientoPrimeraLineaTotal}',
         ),
+        ..._proximosFestivos(store),
       ],
     );
+  }
+
+  List<Widget> _proximosFestivos(TalentoHumanoStore store) {
+    final hoy = DateTime.now();
+    final inicioHoy = DateTime(hoy.year, hoy.month, hoy.day);
+    final proximos = store.diasCalendario
+        .where((d) => d.esFestivo && !d.fecha.isBefore(inicioHoy))
+        .take(5)
+        .toList();
+    if (proximos.isEmpty) return const [];
+    return [
+      const SizedBox(height: 16),
+      const Text(
+        'Próximos días festivos',
+        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+      ),
+      const SizedBox(height: 8),
+      ...proximos.map(
+        (d) => Card(
+          margin: const EdgeInsets.only(bottom: 8),
+          child: ListTile(
+            leading: const Icon(Icons.celebration),
+            title: Text(d.descripcion),
+            trailing: Text(_fmtFecha(d.fecha)),
+          ),
+        ),
+      ),
+    ];
   }
 
   Widget _saldoTile(String titulo, String valor) {

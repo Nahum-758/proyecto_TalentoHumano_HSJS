@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:talento_humano/src/core/hospital_theme.dart';
 import 'package:talento_humano/src/core/talento_humano_store.dart';
+import 'package:talento_humano/src/features/dashboard/presentacion/admin_catalogos.dart';
+import 'package:talento_humano/src/features/dashboard/presentacion/admin_reportes.dart';
+import 'package:talento_humano/src/features/dashboard/presentacion/notificaciones_boton.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -56,9 +59,94 @@ class _AdminDashboardState extends State<AdminDashboard> {
     }
   }
 
+  /// Campos de número de empleado, departamento y puesto para los diálogos.
+  List<Widget> _camposOrganizacion({
+    required StateSetter setModalState,
+    required TextEditingController numeroCtrl,
+    required TextEditingController puestoCtrl,
+    required String? departamentoId,
+    required String? puestoId,
+    required ValueChanged<String?> onDepartamento,
+    required ValueChanged<String?> onPuesto,
+  }) {
+    final store = TalentoHumanoStore.instance;
+    final deptos = store.departamentos;
+    final puestos = store.puestos;
+    final deptoValido =
+        deptos.any((d) => d.id == departamentoId) ? departamentoId : null;
+    final puestoValido =
+        puestos.any((p) => p.id == puestoId) ? puestoId : null;
+
+    return [
+      TextField(
+        controller: numeroCtrl,
+        decoration: InputDecoration(
+          labelText: 'Número de empleado',
+          helperText: 'Vacío = se asigna ${store.siguienteNumeroEmpleado()}',
+          border: const OutlineInputBorder(),
+        ),
+      ),
+      const SizedBox(height: 10),
+      DropdownButtonFormField<String?>(
+        initialValue: deptoValido,
+        decoration: const InputDecoration(
+          labelText: 'Departamento',
+          border: OutlineInputBorder(),
+        ),
+        items: [
+          const DropdownMenuItem<String?>(
+            value: null,
+            child: Text('Sin departamento'),
+          ),
+          ...deptos.map(
+            (d) => DropdownMenuItem<String?>(value: d.id, child: Text(d.nombre)),
+          ),
+        ],
+        onChanged: (v) => setModalState(() => onDepartamento(v)),
+      ),
+      const SizedBox(height: 10),
+      if (puestos.isNotEmpty)
+        DropdownButtonFormField<String?>(
+          initialValue: puestoValido,
+          decoration: const InputDecoration(
+            labelText: 'Puesto (catálogo)',
+            border: OutlineInputBorder(),
+          ),
+          items: [
+            const DropdownMenuItem<String?>(
+              value: null,
+              child: Text('Otro (texto libre)'),
+            ),
+            ...puestos.map(
+              (p) => DropdownMenuItem<String?>(value: p.id, child: Text(p.nombre)),
+            ),
+          ],
+          onChanged: (v) => setModalState(() {
+            onPuesto(v);
+            if (v != null) {
+              puestoCtrl.text = store.buscarPuesto(v)?.nombre ?? puestoCtrl.text;
+            }
+          }),
+        ),
+      if (puestos.isEmpty || puestoValido == null) ...[
+        if (puestos.isNotEmpty) const SizedBox(height: 10),
+        TextField(
+          controller: puestoCtrl,
+          decoration: const InputDecoration(
+            labelText: 'Puesto',
+            border: OutlineInputBorder(),
+          ),
+        ),
+      ],
+    ];
+  }
+
   Future<void> _dialogoAgregarEmpleado() async {
     final nombreCtrl = TextEditingController();
     final puestoCtrl = TextEditingController(text: 'Operativo');
+    final numeroCtrl = TextEditingController();
+    String? departamentoId;
+    String? puestoId;
     final correoCtrl = TextEditingController();
     final passCtrl = TextEditingController(text: '1234');
     String rolSeleccionado = 'empleado';
@@ -84,12 +172,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   ),
                 ),
                 const SizedBox(height: 10),
-                TextField(
-                  controller: puestoCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Puesto o departamento',
-                    border: OutlineInputBorder(),
-                  ),
+                ..._camposOrganizacion(
+                  setModalState: setModalState,
+                  numeroCtrl: numeroCtrl,
+                  puestoCtrl: puestoCtrl,
+                  departamentoId: departamentoId,
+                  puestoId: puestoId,
+                  onDepartamento: (v) => departamentoId = v,
+                  onPuesto: (v) => puestoId = v,
                 ),
                 const SizedBox(height: 10),
                 DropdownButtonFormField<String>(
@@ -203,6 +293,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
     if (guardar == true && nombreCtrl.text.trim().isNotEmpty && mounted) {
       final emp = Empleado(
         id: 'emp_${DateTime.now().millisecondsSinceEpoch}',
+        numeroEmpleado: numeroCtrl.text.trim(),
+        departamentoId: departamentoId,
+        puestoId: puestoId,
         nombre: nombreCtrl.text.trim(),
         puesto: puestoCtrl.text.trim().isEmpty
             ? 'Operativo'
@@ -230,6 +323,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
     final nombreCtrl = TextEditingController(text: emp.nombre);
     final puestoCtrl = TextEditingController(text: emp.puesto);
+    final numeroCtrl = TextEditingController(text: emp.numeroEmpleado);
+    String? departamentoId = emp.departamentoId;
+    String? puestoId = emp.puestoId;
+    EstadoLaboral estadoLaboral = emp.estadoLaboral;
     final correoCtrl = TextEditingController(text: usrActual?.correo ?? '');
     final passCtrl = TextEditingController(text: usrActual?.password ?? '');
     String rolSeleccionado = usrActual?.rol ?? 'empleado';
@@ -287,13 +384,37 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   ),
                 ),
                 const SizedBox(height: 10),
-                TextField(
-                  controller: puestoCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Puesto',
-                    border: OutlineInputBorder(),
-                  ),
+                ..._camposOrganizacion(
+                  setModalState: setModalState,
+                  numeroCtrl: numeroCtrl,
+                  puestoCtrl: puestoCtrl,
+                  departamentoId: departamentoId,
+                  puestoId: puestoId,
+                  onDepartamento: (v) => departamentoId = v,
+                  onPuesto: (v) => puestoId = v,
                 ),
+                if (emp.activo) ...[
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<EstadoLaboral>(
+                    initialValue: estadoLaboral,
+                    decoration: const InputDecoration(
+                      labelText: 'Estado laboral',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: EstadoLaboral.values
+                        .where((e) => e != EstadoLaboral.baja)
+                        .map(
+                          (e) => DropdownMenuItem(
+                            value: e,
+                            child: Text(e.etiqueta),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) {
+                      if (v != null) setModalState(() => estadoLaboral = v);
+                    },
+                  ),
+                ],
                 const SizedBox(height: 10),
                 TextField(
                   controller: correoCtrl,
@@ -564,8 +685,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
 
     if (ok == true && mounted) {
-      final editado = Empleado(
-        id: emp.id,
+      int n(TextEditingController c, int actual) =>
+          int.tryParse(c.text.trim()) ?? actual;
+
+      final editado = emp.copyWith(
+        numeroEmpleado: numeroCtrl.text.trim(),
+        departamentoId: departamentoId,
+        puestoId: puestoId,
+        estadoLaboral: emp.activo ? estadoLaboral : null,
         nombre: nombreCtrl.text.trim().isEmpty
             ? emp.nombre
             : nombreCtrl.text.trim(),
@@ -574,41 +701,37 @@ class _AdminDashboardState extends State<AdminDashboard> {
             : puestoCtrl.text.trim(),
         fechaIngreso: ingreso,
         fechaNacimiento: nacimiento,
-        vecesVacacionesAnio:
-            int.tryParse(vecesVacCtrl.text.trim()) ?? emp.vecesVacacionesAnio,
-        diasPorPeriodoVacaciones: int.tryParse(diasPeriodoCtrl.text.trim()) ??
-            emp.diasPorPeriodoVacaciones,
-        diasVacacionesUsados:
-            int.tryParse(vacUsadosCtrl.text.trim()) ?? emp.diasVacacionesUsados,
-        vigenciaVacaciones: emp.vigenciaVacaciones,
-        permisosEntradaTardeTotal: int.tryParse(tardeTotCtrl.text.trim()) ??
-            emp.permisosEntradaTardeTotal,
-        permisosEntradaTardeUsados: int.tryParse(tardeUsaCtrl.text.trim()) ??
-            emp.permisosEntradaTardeUsados,
-        permisosSalidaAntesTotal: int.tryParse(salidaTotCtrl.text.trim()) ??
-            emp.permisosSalidaAntesTotal,
-        permisosSalidaAntesUsados: int.tryParse(salidaUsaCtrl.text.trim()) ??
-            emp.permisosSalidaAntesUsados,
-        faltasConGoceTotal: int.tryParse(conGoceTotCtrl.text.trim()) ??
-            emp.faltasConGoceTotal,
-        faltasConGoceUsados: int.tryParse(conGoceUsaCtrl.text.trim()) ??
-            emp.faltasConGoceUsados,
-        faltasSinGoceTotal: int.tryParse(sinGoceTotCtrl.text.trim()) ??
-            emp.faltasSinGoceTotal,
-        faltasSinGoceUsados: int.tryParse(sinGoceUsaCtrl.text.trim()) ??
-            emp.faltasSinGoceUsados,
-        diaCumpleanosTotal: int.tryParse(cumpleTotCtrl.text.trim()) ??
-            emp.diaCumpleanosTotal,
-        diaCumpleanosUsados: int.tryParse(cumpleUsaCtrl.text.trim()) ??
-            emp.diaCumpleanosUsados,
-        fallecimientoPrimeraLineaTotal: int.tryParse(lutoTotCtrl.text.trim()) ??
-            emp.fallecimientoPrimeraLineaTotal,
-        fallecimientoPrimeraLineaUsados: int.tryParse(lutoUsaCtrl.text.trim()) ??
-            emp.fallecimientoPrimeraLineaUsados,
-        activo: emp.activo,
-        fechaBaja: emp.fechaBaja,
-        motivoBaja: emp.motivoBaja,
+        vecesVacacionesAnio: n(vecesVacCtrl, emp.vecesVacacionesAnio),
+        diasPorPeriodoVacaciones:
+            n(diasPeriodoCtrl, emp.diasPorPeriodoVacaciones),
+        diasVacacionesUsados: n(vacUsadosCtrl, emp.diasVacacionesUsados),
+        permisosEntradaTardeTotal:
+            n(tardeTotCtrl, emp.permisosEntradaTardeTotal),
+        permisosEntradaTardeUsados:
+            n(tardeUsaCtrl, emp.permisosEntradaTardeUsados),
+        permisosSalidaAntesTotal:
+            n(salidaTotCtrl, emp.permisosSalidaAntesTotal),
+        permisosSalidaAntesUsados:
+            n(salidaUsaCtrl, emp.permisosSalidaAntesUsados),
+        faltasConGoceTotal: n(conGoceTotCtrl, emp.faltasConGoceTotal),
+        faltasConGoceUsados: n(conGoceUsaCtrl, emp.faltasConGoceUsados),
+        faltasSinGoceTotal: n(sinGoceTotCtrl, emp.faltasSinGoceTotal),
+        faltasSinGoceUsados: n(sinGoceUsaCtrl, emp.faltasSinGoceUsados),
+        diaCumpleanosTotal: n(cumpleTotCtrl, emp.diaCumpleanosTotal),
+        diaCumpleanosUsados: n(cumpleUsaCtrl, emp.diaCumpleanosUsados),
+        fallecimientoPrimeraLineaTotal:
+            n(lutoTotCtrl, emp.fallecimientoPrimeraLineaTotal),
+        fallecimientoPrimeraLineaUsados:
+            n(lutoUsaCtrl, emp.fallecimientoPrimeraLineaUsados),
       );
+
+      if (editado.estadoLaboral != emp.estadoLaboral) {
+        await store.enviarNotificacion(
+          idEmpleado: emp.id,
+          mensaje:
+              'Tu estado laboral cambió a: ${editado.estadoLaboral.etiqueta}.',
+        );
+      }
 
       await store.guardarEmpleado(
         editado,
@@ -1008,8 +1131,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
           case 2:
             cuerpo = _buildApartadoTabulador(store);
             break;
-          default:
+          case 3:
             cuerpo = _buildIncidenciasYConfig(store);
+            break;
+          case 4:
+            cuerpo = const AdminCatalogosView();
+            break;
+          default:
+            cuerpo = const AdminReportesView();
             break;
         }
 
@@ -1029,6 +1158,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
               ],
             ),
             actions: [
+              const NotificacionesBoton(idEmpleado: null),
               IconButton(
                 tooltip: 'Sincronizar con Supabase',
                 icon: store.cargando
@@ -1068,7 +1198,28 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       label: const Text('Registrar'),
                     )
                   : null,
-          body: cuerpo,
+          body: Column(
+            children: [
+              if (store.ultimoError != null)
+                MaterialBanner(
+                  backgroundColor: Colors.red.shade50,
+                  content: Text(
+                    store.ultimoError!,
+                    style: TextStyle(
+                      color: Colors.red.shade900,
+                      fontSize: 12,
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => store.sincronizarDesdeSupabase(),
+                      child: const Text('Reintentar'),
+                    ),
+                  ],
+                ),
+              Expanded(child: cuerpo),
+            ],
+          ),
           bottomNavigationBar: NavigationBar(
             selectedIndex: _indiceActual,
             onDestinationSelected: (i) => setState(() => _indiceActual = i),
@@ -1086,12 +1237,22 @@ class _AdminDashboardState extends State<AdminDashboard> {
               NavigationDestination(
                 icon: Icon(Icons.table_chart_outlined),
                 selectedIcon: Icon(Icons.table_chart),
-                label: 'Tabla vac.. Atinguedad',
+                label: 'Tabulador',
               ),
               NavigationDestination(
                 icon: Icon(Icons.settings_outlined),
                 selectedIcon: Icon(Icons.settings),
                 label: 'Incidencias',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.apartment_outlined),
+                selectedIcon: Icon(Icons.apartment),
+                label: 'Catálogos',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.summarize_outlined),
+                selectedIcon: Icon(Icons.summarize),
+                label: 'Reportes',
               ),
             ],
           ),
@@ -1262,12 +1423,20 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       children: [
                         if (pendiente) ...[
                           FilledButton.icon(
-                            onPressed: () => store.actualizarEstatusSolicitud(
-                              s.id,
-                              'AUTORIZADA',
-                              fechaAutorizadaInicio: s.fechaInicio,
-                              fechaAutorizadaFin: s.fechaFin,
-                            ),
+                            onPressed: () async {
+                              final error =
+                                  await store.actualizarEstatusSolicitud(
+                                s.id,
+                                'AUTORIZADA',
+                                fechaAutorizadaInicio: s.fechaInicio,
+                                fechaAutorizadaFin: s.fechaFin,
+                              );
+                              if (error != null && mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text(error)),
+                                );
+                              }
+                            },
                             icon: const Icon(Icons.check),
                             label: const Text('Autorizar'),
                           ),
@@ -1316,7 +1485,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
         : baseLista.where((e) {
             final matchNombre = e.nombre.toLowerCase().contains(query);
             final matchPuesto = e.puesto.toLowerCase().contains(query);
-            return matchNombre || matchPuesto;
+            final matchNumero =
+                e.numeroEmpleado.toLowerCase().contains(query);
+            final matchDepto = store
+                .nombreDepartamento(e.departamentoId)
+                .toLowerCase()
+                .contains(query);
+            return matchNombre || matchPuesto || matchNumero || matchDepto;
           }).toList();
 
     final tituloLista = _filtroEstadoEmpleado == 'BAJAS'
@@ -1332,7 +1507,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           controller: _busquedaEmpleadosCtrl,
           onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
-            labelText: 'Buscar colaborador por nombre o puesto',
+            labelText: 'Buscar por nombre, número, puesto o departamento',
             prefixIcon: const Icon(Icons.search),
             suffixIcon: _busquedaEmpleadosCtrl.text.isEmpty
                 ? null
@@ -1395,10 +1570,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
               margin: const EdgeInsets.only(bottom: 10),
               child: ListTile(
                 title: Text(
-                  e.activo ? '${e.nombre} (${e.puesto})' : '${e.nombre} • BAJA',
+                  e.activo
+                      ? '${e.numeroEmpleado.isEmpty ? '' : '${e.numeroEmpleado} · '}${e.nombre} (${e.puesto})'
+                      : '${e.nombre} • BAJA',
                 ),
                 subtitle: Text(
-                  'Antigüedad: ${e.antiguedadTexto} | Vacaciones disp.: ${e.diasVacacionesDisponibles}\nIngreso: ${_fmtFecha(e.fechaIngreso)} | Nac.: ${_fmtFecha(e.fechaNacimiento)}',
+                  '${store.nombreDepartamento(e.departamentoId)} | Estado: ${e.estadoLaboral.etiqueta}\nAntigüedad: ${e.antiguedadTexto} | Vacaciones disp.: ${e.diasVacacionesDisponibles}\nIngreso: ${_fmtFecha(e.fechaIngreso)} | Nac.: ${_fmtFecha(e.fechaNacimiento)}',
                 ),
                 isThreeLine: true,
                 trailing: PopupMenuButton<String>(

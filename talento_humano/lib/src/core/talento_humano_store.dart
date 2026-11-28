@@ -2,6 +2,9 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:talento_humano/src/core/modelos_rh.dart';
+
+export 'package:talento_humano/src/core/modelos_rh.dart';
 
 class RangoTabuladorVacaciones {
   final int minAnios;
@@ -120,8 +123,12 @@ class UsuarioCuenta {
 
 class Empleado {
   final String id;
+  final String numeroEmpleado;
   final String nombre;
   final String puesto;
+  final String? puestoId;
+  final String? departamentoId;
+  final EstadoLaboral estadoLaboral;
   final DateTime fechaIngreso;
   final DateTime? fechaNacimiento;
   final int vecesVacacionesAnio;
@@ -148,8 +155,12 @@ class Empleado {
 
   Empleado({
     required this.id,
+    this.numeroEmpleado = '',
     required this.nombre,
     required this.puesto,
+    this.puestoId,
+    this.departamentoId,
+    EstadoLaboral? estadoLaboral,
     required this.fechaIngreso,
     this.fechaNacimiento,
     this.vecesVacacionesAnio = 2,
@@ -171,11 +182,110 @@ class Empleado {
     this.activo = true,
     this.fechaBaja,
     this.motivoBaja = '',
-  }) : vigenciaVacaciones =
-            vigenciaVacaciones ?? TalentoHumanoStore.finCicloAnual();
+  })  : vigenciaVacaciones =
+            vigenciaVacaciones ?? TalentoHumanoStore.finCicloAnual(),
+        estadoLaboral = !activo
+            ? EstadoLaboral.baja
+            : (estadoLaboral == null || estadoLaboral == EstadoLaboral.baja)
+                ? EstadoLaboral.activo
+                : estadoLaboral;
 
-  int get aniosCumplidos {
-    final hoy = DateTime.now();
+  static const Object _sinCambio = Object();
+
+  Empleado copyWith({
+    String? numeroEmpleado,
+    String? nombre,
+    String? puesto,
+    Object? puestoId = _sinCambio,
+    Object? departamentoId = _sinCambio,
+    EstadoLaboral? estadoLaboral,
+    DateTime? fechaIngreso,
+    Object? fechaNacimiento = _sinCambio,
+    int? vecesVacacionesAnio,
+    int? diasPorPeriodoVacaciones,
+    int? diasVacacionesUsados,
+    DateTime? vigenciaVacaciones,
+    int? permisosEntradaTardeTotal,
+    int? permisosEntradaTardeUsados,
+    int? permisosSalidaAntesTotal,
+    int? permisosSalidaAntesUsados,
+    int? faltasConGoceTotal,
+    int? faltasConGoceUsados,
+    int? faltasSinGoceTotal,
+    int? faltasSinGoceUsados,
+    int? diaCumpleanosTotal,
+    int? diaCumpleanosUsados,
+    int? fallecimientoPrimeraLineaTotal,
+    int? fallecimientoPrimeraLineaUsados,
+    bool? activo,
+    Object? fechaBaja = _sinCambio,
+    String? motivoBaja,
+  }) {
+    return Empleado(
+      id: id,
+      numeroEmpleado: numeroEmpleado ?? this.numeroEmpleado,
+      nombre: nombre ?? this.nombre,
+      puesto: puesto ?? this.puesto,
+      puestoId: identical(puestoId, _sinCambio)
+          ? this.puestoId
+          : puestoId as String?,
+      departamentoId: identical(departamentoId, _sinCambio)
+          ? this.departamentoId
+          : departamentoId as String?,
+      estadoLaboral: estadoLaboral ?? this.estadoLaboral,
+      fechaIngreso: fechaIngreso ?? this.fechaIngreso,
+      fechaNacimiento: identical(fechaNacimiento, _sinCambio)
+          ? this.fechaNacimiento
+          : fechaNacimiento as DateTime?,
+      vecesVacacionesAnio: vecesVacacionesAnio ?? this.vecesVacacionesAnio,
+      diasPorPeriodoVacaciones:
+          diasPorPeriodoVacaciones ?? this.diasPorPeriodoVacaciones,
+      diasVacacionesUsados: diasVacacionesUsados ?? this.diasVacacionesUsados,
+      vigenciaVacaciones: vigenciaVacaciones ?? this.vigenciaVacaciones,
+      permisosEntradaTardeTotal:
+          permisosEntradaTardeTotal ?? this.permisosEntradaTardeTotal,
+      permisosEntradaTardeUsados:
+          permisosEntradaTardeUsados ?? this.permisosEntradaTardeUsados,
+      permisosSalidaAntesTotal:
+          permisosSalidaAntesTotal ?? this.permisosSalidaAntesTotal,
+      permisosSalidaAntesUsados:
+          permisosSalidaAntesUsados ?? this.permisosSalidaAntesUsados,
+      faltasConGoceTotal: faltasConGoceTotal ?? this.faltasConGoceTotal,
+      faltasConGoceUsados: faltasConGoceUsados ?? this.faltasConGoceUsados,
+      faltasSinGoceTotal: faltasSinGoceTotal ?? this.faltasSinGoceTotal,
+      faltasSinGoceUsados: faltasSinGoceUsados ?? this.faltasSinGoceUsados,
+      diaCumpleanosTotal: diaCumpleanosTotal ?? this.diaCumpleanosTotal,
+      diaCumpleanosUsados: diaCumpleanosUsados ?? this.diaCumpleanosUsados,
+      fallecimientoPrimeraLineaTotal:
+          fallecimientoPrimeraLineaTotal ?? this.fallecimientoPrimeraLineaTotal,
+      fallecimientoPrimeraLineaUsados: fallecimientoPrimeraLineaUsados ??
+          this.fallecimientoPrimeraLineaUsados,
+      activo: activo ?? this.activo,
+      fechaBaja:
+          identical(fechaBaja, _sinCambio) ? this.fechaBaja : fechaBaja as DateTime?,
+      motivoBaja: motivoBaja ?? this.motivoBaja,
+    );
+  }
+
+  /// Saldo disponible para un tipo de solicitud (vacaciones o permiso).
+  int saldoDisponiblePara(String tipo) {
+    final t = tipo.toLowerCase();
+    if (t.contains('vacacion')) return diasVacacionesDisponibles;
+    if (t.contains('entrada tarde')) return permisosEntradaTardeDisponibles;
+    if (t.contains('salida antes')) return permisosSalidaAntesDisponibles;
+    if (t.contains('con goce')) return faltasConGoceDisponibles;
+    if (t.contains('sin goce')) return faltasSinGoceDisponibles;
+    if (t.contains('cumple')) return diaCumpleanosDisponibles;
+    if (t.contains('fallecimiento')) {
+      final d = fallecimientoPrimeraLineaDisponibles;
+      return d < 3 ? d : 3;
+    }
+    return 0;
+  }
+
+  /// Años completos de antigüedad (método `calcularAntiguedad()` del diagrama).
+  int calcularAntiguedad([DateTime? referencia]) {
+    final hoy = referencia ?? DateTime.now();
     int anios = hoy.year - fechaIngreso.year;
     if (hoy.month < fechaIngreso.month ||
         (hoy.month == fechaIngreso.month && hoy.day < fechaIngreso.day)) {
@@ -183,6 +293,8 @@ class Empleado {
     }
     return anios < 0 ? 0 : anios;
   }
+
+  int get aniosCumplidos => calcularAntiguedad();
 
   String get antiguedadTexto {
     final hoy = DateTime.now();
@@ -253,10 +365,22 @@ class Empleado {
     return r < 0 ? 0 : r;
   }
 
+  /// Columnas agregadas en la migración del diagrama de clases.
+  static const columnasNuevas = [
+    'numero_empleado',
+    'puesto_id',
+    'departamento_id',
+    'estado_laboral',
+  ];
+
   Map<String, dynamic> toMap() => {
         'id': id,
+        'numero_empleado': numeroEmpleado,
         'nombre': nombre,
         'puesto': puesto,
+        'puesto_id': puestoId,
+        'departamento_id': departamentoId,
+        'estado_laboral': estadoLaboral.clave,
         'fecha_ingreso': fechaIngreso.toIso8601String(),
         'fecha_nacimiento': fechaNacimiento?.toIso8601String(),
         'veces_vacaciones_anio': vecesVacacionesAnio,
@@ -292,10 +416,21 @@ class Empleado {
       return int.tryParse(v.toString()) ?? fallback;
     }
 
+    final activo = map['activo'] is bool
+        ? map['activo'] as bool
+        : (map['activo']?.toString().toLowerCase() != 'false');
+
     return Empleado(
       id: (map['id'] ?? '').toString(),
+      numeroEmpleado: (map['numero_empleado'] ?? '').toString(),
       nombre: (map['nombre'] ?? '').toString(),
       puesto: (map['puesto'] ?? 'Operativo').toString(),
+      puestoId: map['puesto_id']?.toString(),
+      departamentoId: map['departamento_id']?.toString(),
+      estadoLaboral: EstadoLaboral.desdeClave(
+        map['estado_laboral']?.toString(),
+        activo: activo,
+      ),
       fechaIngreso: parseFecha(map['fecha_ingreso'], DateTime.now()),
       fechaNacimiento: map['fecha_nacimiento'] != null
           ? DateTime.tryParse(map['fecha_nacimiento'].toString())
@@ -325,9 +460,7 @@ class Empleado {
           parseInt(map['fallecimiento_primera_linea_total'], 3),
       fallecimientoPrimeraLineaUsados:
           parseInt(map['fallecimiento_primera_linea_usados'], 0),
-      activo: map['activo'] is bool
-          ? map['activo'] as bool
-          : (map['activo']?.toString().toLowerCase() != 'false'),
+      activo: activo,
       fechaBaja: map['fecha_baja'] != null
           ? DateTime.tryParse(map['fecha_baja'].toString())
           : null,
@@ -441,13 +574,24 @@ class TalentoHumanoStore extends ChangeNotifier {
   static const String _kUsuariosKey = 'hsjs_usuarios_v1';
   static const String _kSolicitudesKey = 'hsjs_solicitudes_v1';
   static const String _kIncidenciasKey = 'hsjs_incidencias_v1';
+  static const String _kDepartamentosKey = 'hsjs_departamentos_v1';
+  static const String _kPuestosKey = 'hsjs_puestos_v1';
+  static const String _kNotificacionesKey = 'hsjs_notificaciones_v1';
+  static const String _kCalendarioKey = 'hsjs_calendario_v1';
+  static const String _kReportesKey = 'hsjs_reportes_v1';
 
   final List<Empleado> _empleados = [];
   final List<UsuarioCuenta> _usuarios = [];
   final List<SolicitudPermiso> _solicitudes = [];
   final List<RegistroIncidencia> _incidencias = [];
+  final List<Departamento> _departamentos = [];
+  final List<Puesto> _puestos = [];
+  final List<Notificacion> _notificaciones = [];
+  final List<DiaCalendario> _calendario = [];
+  final List<Reporte> _reportes = [];
 
   String? _empleadoActualId;
+  String? _usuarioActualId;
   String? _rolActual;
   bool _cargando = false;
   String? _ultimoError;
@@ -462,12 +606,46 @@ class TalentoHumanoStore extends ChangeNotifier {
       _empleados.where((e) => !e.activo).toList();
   List<SolicitudPermiso> get solicitudes => List.unmodifiable(_solicitudes);
   List<RegistroIncidencia> get incidencias => List.unmodifiable(_incidencias);
+  List<Departamento> get departamentos => List.unmodifiable(
+        [..._departamentos]..sort((a, b) => a.nombre.compareTo(b.nombre)),
+      );
+  List<Puesto> get puestos => List.unmodifiable(
+        [..._puestos]..sort((a, b) => a.nombre.compareTo(b.nombre)),
+      );
+  List<DiaCalendario> get diasCalendario => List.unmodifiable(
+        [..._calendario]..sort((a, b) => a.fecha.compareTo(b.fecha)),
+      );
+  CalendarioLaboral get calendarioLaboral => CalendarioLaboral(_calendario);
+  List<Reporte> get reportes => List.unmodifiable(
+        [..._reportes]
+          ..sort((a, b) => b.fechaGeneracion.compareTo(a.fechaGeneracion)),
+      );
 
   Empleado? get empleadoActual {
     if (_empleadoActualId == null) {
       return empleadosActivos.isNotEmpty ? empleadosActivos.first : null;
     }
     return buscarEmpleadoPorId(_empleadoActualId!);
+  }
+
+  /// Administrador de RH con sesión iniciada (null si el rol no es admin).
+  AdministradorRH? get administradorActual {
+    if (_rolActual != 'admin') return null;
+    UsuarioCuenta? u;
+    for (final x in _usuarios) {
+      if (x.id == _usuarioActualId) u = x;
+    }
+    final emp =
+        _empleadoActualId != null ? buscarEmpleadoPorId(_empleadoActualId!) : null;
+    String? nombreDepto;
+    if (emp?.departamentoId != null) {
+      nombreDepto = buscarDepartamento(emp!.departamentoId!)?.nombre;
+    }
+    return AdministradorRH(
+      id: u?.id ?? 'admin',
+      nombre: emp?.nombre ?? u?.correo ?? 'Administrador',
+      area: nombreDepto ?? 'Recursos Humanos',
+    );
   }
 
   static DateTime inicioCicloAnual([DateTime? ref]) {
@@ -486,10 +664,14 @@ class TalentoHumanoStore extends ChangeNotifier {
   String get cicloAnualTexto {
     final ini = inicioCicloAnual();
     final fin = finCicloAnual();
-    String f(DateTime d) =>
-        '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
-    return '${f(ini)} al ${f(fin)}';
+    return '${fmtFecha(ini)} al ${fmtFecha(fin)}';
   }
+
+  static String fmtFecha(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+
+  static String _nuevoId(String prefijo) =>
+      '${prefijo}_${DateTime.now().microsecondsSinceEpoch}';
 
   bool get _supabaseActivo {
     try {
@@ -500,9 +682,31 @@ class TalentoHumanoStore extends ChangeNotifier {
     }
   }
 
+  /// Ejecuta una operación remota sin romper la app si Supabase falla.
+  Future<void> _remoto(Future<void> Function(SupabaseClient c) op) async {
+    if (!_supabaseActivo) return;
+    try {
+      await op(Supabase.instance.client);
+    } catch (e) {
+      debugPrint('Supabase: $e');
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Búsquedas
+  // ---------------------------------------------------------------------------
+
   Empleado? buscarEmpleadoPorId(String id) {
     for (final e in _empleados) {
       if (e.id == id) return e;
+    }
+    return null;
+  }
+
+  Empleado? buscarEmpleadoPorNombre(String nombre) {
+    final n = nombre.trim().toLowerCase();
+    for (final e in _empleados) {
+      if (e.nombre.trim().toLowerCase() == n) return e;
     }
     return null;
   }
@@ -514,6 +718,47 @@ class TalentoHumanoStore extends ChangeNotifier {
     return null;
   }
 
+  Departamento? buscarDepartamento(String id) {
+    for (final d in _departamentos) {
+      if (d.id == id) return d;
+    }
+    return null;
+  }
+
+  Puesto? buscarPuesto(String id) {
+    for (final p in _puestos) {
+      if (p.id == id) return p;
+    }
+    return null;
+  }
+
+  String nombreDepartamento(String? id) =>
+      id == null ? 'Sin departamento' : (buscarDepartamento(id)?.nombre ?? 'Sin departamento');
+
+  List<Empleado> empleadosDeDepartamento(String departamentoId) =>
+      _empleados.where((e) => e.departamentoId == departamentoId).toList();
+
+  List<Empleado> empleadosDePuesto(String puestoId) =>
+      _empleados.where((e) => e.puestoId == puestoId).toList();
+
+  /// Siguiente número de empleado consecutivo (E0001, E0002, ...).
+  String siguienteNumeroEmpleado() {
+    var max = 0;
+    final re = RegExp(r'(\d+)$');
+    for (final e in _empleados) {
+      final m = re.firstMatch(e.numeroEmpleado);
+      if (m != null) {
+        final n = int.tryParse(m.group(1)!) ?? 0;
+        if (n > max) max = n;
+      }
+    }
+    return 'E${(max + 1).toString().padLeft(4, '0')}';
+  }
+
+  // ---------------------------------------------------------------------------
+  // Sesión
+  // ---------------------------------------------------------------------------
+
   void establecerSesionEmpleado(String? empleadoId, {String rol = 'empleado'}) {
     _empleadoActualId = empleadoId;
     _rolActual = rol;
@@ -522,56 +767,47 @@ class TalentoHumanoStore extends ChangeNotifier {
 
   void cerrarSesion() {
     _empleadoActualId = null;
+    _usuarioActualId = null;
     _rolActual = null;
     notifyListeners();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Persistencia local y sincronización
+  // ---------------------------------------------------------------------------
+
+  void _cargarLista<T>(
+    SharedPreferences prefs,
+    String clave,
+    List<T> destino,
+    T Function(Map<String, dynamic>) fromMap,
+  ) {
+    final raw = prefs.getString(clave);
+    if (raw == null) return;
+    try {
+      final list = jsonDecode(raw) as List<dynamic>;
+      destino
+        ..clear()
+        ..addAll(list.map((e) => fromMap(Map<String, dynamic>.from(e))));
+    } catch (_) {}
   }
 
   Future<void> cargarLocal() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final rawEmp = prefs.getString(_kEmpleadosKey);
-      final rawUsr = prefs.getString(_kUsuariosKey);
-      final rawSol = prefs.getString(_kSolicitudesKey);
-      final rawInc = prefs.getString(_kIncidenciasKey);
-
-      if (rawEmp != null) {
-        final list = jsonDecode(rawEmp) as List<dynamic>;
-        _empleados
-          ..clear()
-          ..addAll(
-            list.map((e) => Empleado.fromMap(Map<String, dynamic>.from(e))),
-          );
-      }
-      if (rawUsr != null) {
-        final list = jsonDecode(rawUsr) as List<dynamic>;
-        _usuarios
-          ..clear()
-          ..addAll(
-            list.map(
-              (u) => UsuarioCuenta.fromMap(Map<String, dynamic>.from(u)),
-            ),
-          );
-      }
-      if (rawSol != null) {
-        final list = jsonDecode(rawSol) as List<dynamic>;
-        _solicitudes
-          ..clear()
-          ..addAll(
-            list.map(
-              (s) => SolicitudPermiso.fromMap(Map<String, dynamic>.from(s)),
-            ),
-          );
-      }
-      if (rawInc != null) {
-        final list = jsonDecode(rawInc) as List<dynamic>;
-        _incidencias
-          ..clear()
-          ..addAll(
-            list.map(
-              (i) => RegistroIncidencia.fromMap(Map<String, dynamic>.from(i)),
-            ),
-          );
-      }
+      _cargarLista(prefs, _kEmpleadosKey, _empleados, Empleado.fromMap);
+      _cargarLista(prefs, _kUsuariosKey, _usuarios, UsuarioCuenta.fromMap);
+      _cargarLista(
+          prefs, _kSolicitudesKey, _solicitudes, SolicitudPermiso.fromMap);
+      _cargarLista(
+          prefs, _kIncidenciasKey, _incidencias, RegistroIncidencia.fromMap);
+      _cargarLista(
+          prefs, _kDepartamentosKey, _departamentos, Departamento.fromMap);
+      _cargarLista(prefs, _kPuestosKey, _puestos, Puesto.fromMap);
+      _cargarLista(
+          prefs, _kNotificacionesKey, _notificaciones, Notificacion.fromMap);
+      _cargarLista(prefs, _kCalendarioKey, _calendario, DiaCalendario.fromMap);
+      _cargarLista(prefs, _kReportesKey, _reportes, Reporte.fromMap);
       notifyListeners();
     } catch (_) {}
   }
@@ -579,23 +815,41 @@ class TalentoHumanoStore extends ChangeNotifier {
   Future<void> _guardarLocal() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(
-        _kEmpleadosKey,
-        jsonEncode(_empleados.map((e) => e.toMap()).toList()),
-      );
-      await prefs.setString(
-        _kUsuariosKey,
-        jsonEncode(_usuarios.map((u) => u.toMap()).toList()),
-      );
-      await prefs.setString(
-        _kSolicitudesKey,
-        jsonEncode(_solicitudes.map((s) => s.toMap()).toList()),
-      );
-      await prefs.setString(
-        _kIncidenciasKey,
-        jsonEncode(_incidencias.map((i) => i.toMap()).toList()),
-      );
+      Future<void> g(String k, Iterable<Map<String, dynamic>> v) =>
+          prefs.setString(k, jsonEncode(v.toList()));
+      await g(_kEmpleadosKey, _empleados.map((e) => e.toMap()));
+      await g(_kUsuariosKey, _usuarios.map((u) => u.toMap()));
+      await g(_kSolicitudesKey, _solicitudes.map((s) => s.toMap()));
+      await g(_kIncidenciasKey, _incidencias.map((i) => i.toMap()));
+      await g(_kDepartamentosKey, _departamentos.map((d) => d.toMap()));
+      await g(_kPuestosKey, _puestos.map((p) => p.toMap()));
+      await g(_kNotificacionesKey, _notificaciones.map((n) => n.toMap()));
+      await g(_kCalendarioKey, _calendario.map((d) => d.toMap()));
+      await g(_kReportesKey, _reportes.map((r) => r.toMap()));
     } catch (_) {}
+  }
+
+  /// Descarga una tabla. Si la tabla aún no existe en Supabase (migración
+  /// pendiente) se conserva la copia local y no se interrumpe el resto.
+  Future<void> _descargarTabla<T>(
+    SupabaseClient client,
+    String tabla,
+    List<T> destino,
+    T Function(Map<String, dynamic>) fromMap, {
+    bool obligatoria = false,
+  }) async {
+    try {
+      final res = await client.from(tabla).select();
+      destino
+        ..clear()
+        ..addAll(
+          (res as List<dynamic>)
+              .map((e) => fromMap(Map<String, dynamic>.from(e))),
+        );
+    } catch (e) {
+      if (obligatoria) rethrow;
+      debugPrint('Tabla "$tabla" no disponible: $e');
+    }
   }
 
   Future<void> sincronizarDesdeSupabase() async {
@@ -613,43 +867,25 @@ class TalentoHumanoStore extends ChangeNotifier {
     }
 
     try {
-      final client = Supabase.instance.client;
-
-      final empRes = await client.from('empleados').select();
-      _empleados
-        ..clear()
-        ..addAll(
-          (empRes as List<dynamic>).map(
-            (e) => Empleado.fromMap(Map<String, dynamic>.from(e)),
-          ),
-        );
-
-      final usrRes = await client.from('usuarios').select();
-      _usuarios
-        ..clear()
-        ..addAll(
-          (usrRes as List<dynamic>).map(
-            (u) => UsuarioCuenta.fromMap(Map<String, dynamic>.from(u)),
-          ),
-        );
-
-      final solRes = await client.from('solicitudes').select();
-      _solicitudes
-        ..clear()
-        ..addAll(
-          (solRes as List<dynamic>).map(
-            (s) => SolicitudPermiso.fromMap(Map<String, dynamic>.from(s)),
-          ),
-        );
-
-      final incRes = await client.from('incidencias').select();
-      _incidencias
-        ..clear()
-        ..addAll(
-          (incRes as List<dynamic>).map(
-            (i) => RegistroIncidencia.fromMap(Map<String, dynamic>.from(i)),
-          ),
-        );
+      final c = Supabase.instance.client;
+      await _descargarTabla(c, 'empleados', _empleados, Empleado.fromMap,
+          obligatoria: true);
+      await _descargarTabla(c, 'usuarios', _usuarios, UsuarioCuenta.fromMap,
+          obligatoria: true);
+      await _descargarTabla(
+          c, 'solicitudes', _solicitudes, SolicitudPermiso.fromMap,
+          obligatoria: true);
+      await _descargarTabla(
+          c, 'incidencias', _incidencias, RegistroIncidencia.fromMap,
+          obligatoria: true);
+      await _descargarTabla(
+          c, 'departamentos', _departamentos, Departamento.fromMap);
+      await _descargarTabla(c, 'puestos', _puestos, Puesto.fromMap);
+      await _descargarTabla(
+          c, 'notificaciones', _notificaciones, Notificacion.fromMap);
+      await _descargarTabla(
+          c, 'calendario_laboral', _calendario, DiaCalendario.fromMap);
+      await _descargarTabla(c, 'reportes', _reportes, Reporte.fromMap);
 
       await _guardarLocal();
     } catch (e) {
@@ -691,10 +927,15 @@ class TalentoHumanoStore extends ChangeNotifier {
     }
 
     _empleadoActualId = encontrado.empleadoId;
+    _usuarioActualId = encontrado.id;
     _rolActual = encontrado.rol;
     notifyListeners();
     return encontrado.rol;
   }
+
+  // ---------------------------------------------------------------------------
+  // Empleados (AdministradorRH "gestiona" Empleado)
+  // ---------------------------------------------------------------------------
 
   Future<void> guardarEmpleado(
     Empleado emp, {
@@ -702,6 +943,17 @@ class TalentoHumanoStore extends ChangeNotifier {
     String? password,
     String rol = 'empleado',
   }) async {
+    if (emp.numeroEmpleado.trim().isEmpty) {
+      emp = emp.copyWith(numeroEmpleado: siguienteNumeroEmpleado());
+    }
+    // Mantiene sincronizado el nombre del puesto con el catálogo.
+    if (emp.puestoId != null) {
+      final p = buscarPuesto(emp.puestoId!);
+      if (p != null && p.nombre != emp.puesto) {
+        emp = emp.copyWith(puesto: p.nombre);
+      }
+    }
+
     final idx = _empleados.indexWhere((e) => e.id == emp.id);
     if (idx >= 0) {
       _empleados[idx] = emp;
@@ -716,9 +968,7 @@ class TalentoHumanoStore extends ChangeNotifier {
           ? password.trim()
           : (uIdx >= 0 ? _usuarios[uIdx].password : '1234');
       cuenta = UsuarioCuenta(
-        id: uIdx >= 0
-            ? _usuarios[uIdx].id
-            : 'usr_${DateTime.now().millisecondsSinceEpoch}',
+        id: uIdx >= 0 ? _usuarios[uIdx].id : _nuevoId('usr'),
         correo: correo.trim(),
         password: passFinal,
         rol: rol,
@@ -734,107 +984,112 @@ class TalentoHumanoStore extends ChangeNotifier {
     notifyListeners();
     await _guardarLocal();
 
-    if (_supabaseActivo) {
-      try {
-        await Supabase.instance.client.from('empleados').upsert(emp.toMap());
-        if (cuenta != null) {
-          await Supabase.instance.client
-              .from('usuarios')
-              .upsert(cuenta.toMap());
-        }
-      } catch (_) {}
+    final empFinal = emp;
+    final cuentaFinal = cuenta;
+    await _remoto((c) async {
+      await _upsertEmpleado(c, empFinal);
+      if (cuentaFinal != null) {
+        await c.from('usuarios').upsert(cuentaFinal.toMap());
+      }
+    });
+  }
+
+  /// Si la migración aún no agregó las columnas nuevas a `empleados`,
+  /// reintenta sin ellas para no perder el guardado.
+  Future<void> _upsertEmpleado(SupabaseClient c, Empleado emp) async {
+    try {
+      await c.from('empleados').upsert(emp.toMap());
+    } catch (_) {
+      final mapa = emp.toMap()
+        ..removeWhere((k, _) => Empleado.columnasNuevas.contains(k));
+      await c.from('empleados').upsert(mapa);
     }
   }
 
   Future<void> darDeBajaEmpleado(String id, {String motivo = ''}) async {
-    final idx = _empleados.indexWhere((e) => e.id == id);
-    if (idx == -1) return;
-    final actual = _empleados[idx];
-    final baja = Empleado(
-      id: actual.id,
-      nombre: actual.nombre,
-      puesto: actual.puesto,
-      fechaIngreso: actual.fechaIngreso,
-      fechaNacimiento: actual.fechaNacimiento,
-      vecesVacacionesAnio: actual.vecesVacacionesAnio,
-      diasPorPeriodoVacaciones: actual.diasPorPeriodoVacaciones,
-      diasVacacionesUsados: actual.diasVacacionesUsados,
-      vigenciaVacaciones: actual.vigenciaVacaciones,
-      permisosEntradaTardeTotal: actual.permisosEntradaTardeTotal,
-      permisosEntradaTardeUsados: actual.permisosEntradaTardeUsados,
-      permisosSalidaAntesTotal: actual.permisosSalidaAntesTotal,
-      permisosSalidaAntesUsados: actual.permisosSalidaAntesUsados,
-      faltasConGoceTotal: actual.faltasConGoceTotal,
-      faltasConGoceUsados: actual.faltasConGoceUsados,
-      faltasSinGoceTotal: actual.faltasSinGoceTotal,
-      faltasSinGoceUsados: actual.faltasSinGoceUsados,
-      diaCumpleanosTotal: actual.diaCumpleanosTotal,
-      diaCumpleanosUsados: actual.diaCumpleanosUsados,
-      fallecimientoPrimeraLineaTotal: actual.fallecimientoPrimeraLineaTotal,
-      fallecimientoPrimeraLineaUsados: actual.fallecimientoPrimeraLineaUsados,
-      activo: false,
-      fechaBaja: DateTime.now(),
-      motivoBaja: motivo,
+    final actual = buscarEmpleadoPorId(id);
+    if (actual == null) return;
+    await guardarEmpleado(
+      actual.copyWith(
+        activo: false,
+        estadoLaboral: EstadoLaboral.baja,
+        fechaBaja: DateTime.now(),
+        motivoBaja: motivo,
+      ),
     );
-    await guardarEmpleado(baja);
   }
 
   Future<void> reactivarEmpleado(String id) async {
-    final idx = _empleados.indexWhere((e) => e.id == id);
-    if (idx == -1) return;
-    final actual = _empleados[idx];
-    final reactivado = Empleado(
-      id: actual.id,
-      nombre: actual.nombre,
-      puesto: actual.puesto,
-      fechaIngreso: actual.fechaIngreso,
-      fechaNacimiento: actual.fechaNacimiento,
-      vecesVacacionesAnio: actual.vecesVacacionesAnio,
-      diasPorPeriodoVacaciones: actual.diasPorPeriodoVacaciones,
-      diasVacacionesUsados: actual.diasVacacionesUsados,
-      vigenciaVacaciones: actual.vigenciaVacaciones,
-      permisosEntradaTardeTotal: actual.permisosEntradaTardeTotal,
-      permisosEntradaTardeUsados: actual.permisosEntradaTardeUsados,
-      permisosSalidaAntesTotal: actual.permisosSalidaAntesTotal,
-      permisosSalidaAntesUsados: actual.permisosSalidaAntesUsados,
-      faltasConGoceTotal: actual.faltasConGoceTotal,
-      faltasConGoceUsados: actual.faltasConGoceUsados,
-      faltasSinGoceTotal: actual.faltasSinGoceTotal,
-      faltasSinGoceUsados: actual.faltasSinGoceUsados,
-      diaCumpleanosTotal: actual.diaCumpleanosTotal,
-      diaCumpleanosUsados: actual.diaCumpleanosUsados,
-      fallecimientoPrimeraLineaTotal: actual.fallecimientoPrimeraLineaTotal,
-      fallecimientoPrimeraLineaUsados: actual.fallecimientoPrimeraLineaUsados,
-      activo: true,
-      fechaBaja: null,
-      motivoBaja: '',
+    final actual = buscarEmpleadoPorId(id);
+    if (actual == null) return;
+    await guardarEmpleado(
+      actual.copyWith(
+        activo: true,
+        estadoLaboral: EstadoLaboral.activo,
+        fechaBaja: null,
+        motivoBaja: '',
+      ),
     );
-    await guardarEmpleado(reactivado);
   }
+
+  Future<void> cambiarEstadoLaboral(String id, EstadoLaboral estado) async {
+    final actual = buscarEmpleadoPorId(id);
+    if (actual == null) return;
+    if (estado == EstadoLaboral.baja) {
+      await darDeBajaEmpleado(id, motivo: actual.motivoBaja);
+      return;
+    }
+    await guardarEmpleado(
+      actual.copyWith(
+        estadoLaboral: estado,
+        activo: true,
+        fechaBaja: null,
+      ),
+    );
+    await enviarNotificacion(
+      idEmpleado: id,
+      mensaje: 'Tu estado laboral cambió a: ${estado.etiqueta}.',
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Solicitudes (AdministradorRH "autoriza")
+  // ---------------------------------------------------------------------------
 
   Future<void> crearSolicitud(SolicitudPermiso solicitud) async {
     _solicitudes.insert(0, solicitud);
     notifyListeners();
     await _guardarLocal();
 
-    if (_supabaseActivo) {
-      try {
-        await Supabase.instance.client
-            .from('solicitudes')
-            .insert(solicitud.toMap());
-      } catch (_) {}
-    }
+    await _remoto((c) => c.from('solicitudes').insert(solicitud.toMap()));
+
+    await enviarNotificacion(
+      idEmpleado: null,
+      mensaje:
+          '${solicitud.nombreEmpleado} solicitó ${solicitud.tipo} (${solicitud.diasSolicitados} día(s)).',
+    );
   }
 
-  Future<void> actualizarEstatusSolicitud(
+  /// Devuelve un mensaje de error si no se pudo actualizar.
+  Future<String?> actualizarEstatusSolicitud(
     String id,
     String nuevoEstatus, {
     DateTime? fechaAutorizadaInicio,
     DateTime? fechaAutorizadaFin,
   }) async {
     final idx = _solicitudes.indexWhere((s) => s.id == id);
-    if (idx == -1) return;
+    if (idx == -1) return 'Solicitud no encontrada.';
     final actual = _solicitudes[idx];
+
+    if (actual.estatus != 'AUTORIZADA' && nuevoEstatus == 'AUTORIZADA') {
+      final emp = buscarEmpleadoPorId(actual.idEmpleado);
+      if (emp == null) return 'No se encontró al colaborador.';
+      final disponible = emp.saldoDisponiblePara(actual.tipo);
+      if (actual.diasSolicitados > disponible) {
+        return 'No se puede autorizar: pidió ${actual.diasSolicitados} día(s) '
+            'de ${actual.tipo} y solo tiene $disponible disponible(s).';
+      }
+    }
 
     final actualizada = SolicitudPermiso(
       id: actual.id,
@@ -856,14 +1111,25 @@ class TalentoHumanoStore extends ChangeNotifier {
     notifyListeners();
     await _guardarLocal();
 
-    if (_supabaseActivo) {
-      try {
-        await Supabase.instance.client
-            .from('solicitudes')
-            .update(actualizada.toMap())
-            .eq('id', id);
-      } catch (_) {}
+    await _remoto(
+      (c) => c.from('solicitudes').update(actualizada.toMap()).eq('id', id),
+    );
+
+    if (actual.estatus != nuevoEstatus) {
+      final verbo = nuevoEstatus == 'AUTORIZADA'
+          ? 'fue AUTORIZADA'
+          : nuevoEstatus == 'RECHAZADA'
+              ? 'fue RECHAZADA'
+              : 'cambió a $nuevoEstatus';
+      final fechas = nuevoEstatus == 'AUTORIZADA'
+          ? ' (${fmtFecha(actualizada.fechaInicio)} al ${fmtFecha(actualizada.fechaFin)})'
+          : '';
+      await enviarNotificacion(
+        idEmpleado: actual.idEmpleado,
+        mensaje: 'Tu solicitud de ${actual.tipo} $verbo$fechas.',
+      );
     }
+    return null;
   }
 
   Future<void> _descontarSaldoPorSolicitud(SolicitudPermiso sol) async {
@@ -872,56 +1138,31 @@ class TalentoHumanoStore extends ChangeNotifier {
     final tipoLower = sol.tipo.toLowerCase();
     final cant = sol.diasSolicitados;
 
-    int vacUsados = emp.diasVacacionesUsados;
-    int tardeUsados = emp.permisosEntradaTardeUsados;
-    int salidaUsados = emp.permisosSalidaAntesUsados;
-    int conGoceUsados = emp.faltasConGoceUsados;
-    int sinGoceUsados = emp.faltasSinGoceUsados;
-    int cumpleUsados = emp.diaCumpleanosUsados;
-    int lutoUsados = emp.fallecimientoPrimeraLineaUsados;
-
+    Empleado actualizado = emp;
     if (tipoLower.contains('vacacion')) {
-      vacUsados += cant;
+      actualizado = emp.copyWith(
+          diasVacacionesUsados: emp.diasVacacionesUsados + cant);
     } else if (tipoLower.contains('entrada tarde')) {
-      tardeUsados += cant;
+      actualizado = emp.copyWith(
+          permisosEntradaTardeUsados: emp.permisosEntradaTardeUsados + cant);
     } else if (tipoLower.contains('salida antes')) {
-      salidaUsados += cant;
+      actualizado = emp.copyWith(
+          permisosSalidaAntesUsados: emp.permisosSalidaAntesUsados + cant);
     } else if (tipoLower.contains('con goce')) {
-      conGoceUsados += cant;
+      actualizado =
+          emp.copyWith(faltasConGoceUsados: emp.faltasConGoceUsados + cant);
     } else if (tipoLower.contains('sin goce')) {
-      sinGoceUsados += cant;
+      actualizado =
+          emp.copyWith(faltasSinGoceUsados: emp.faltasSinGoceUsados + cant);
     } else if (tipoLower.contains('cumple')) {
-      cumpleUsados += cant;
+      actualizado =
+          emp.copyWith(diaCumpleanosUsados: emp.diaCumpleanosUsados + cant);
     } else if (tipoLower.contains('fallecimiento')) {
-      lutoUsados += cant;
+      actualizado = emp.copyWith(
+        fallecimientoPrimeraLineaUsados:
+            emp.fallecimientoPrimeraLineaUsados + cant,
+      );
     }
-
-    final actualizado = Empleado(
-      id: emp.id,
-      nombre: emp.nombre,
-      puesto: emp.puesto,
-      fechaIngreso: emp.fechaIngreso,
-      fechaNacimiento: emp.fechaNacimiento,
-      vecesVacacionesAnio: emp.vecesVacacionesAnio,
-      diasPorPeriodoVacaciones: emp.diasPorPeriodoVacaciones,
-      diasVacacionesUsados: vacUsados,
-      vigenciaVacaciones: emp.vigenciaVacaciones,
-      permisosEntradaTardeTotal: emp.permisosEntradaTardeTotal,
-      permisosEntradaTardeUsados: tardeUsados,
-      permisosSalidaAntesTotal: emp.permisosSalidaAntesTotal,
-      permisosSalidaAntesUsados: salidaUsados,
-      faltasConGoceTotal: emp.faltasConGoceTotal,
-      faltasConGoceUsados: conGoceUsados,
-      faltasSinGoceTotal: emp.faltasSinGoceTotal,
-      faltasSinGoceUsados: sinGoceUsados,
-      diaCumpleanosTotal: emp.diaCumpleanosTotal,
-      diaCumpleanosUsados: cumpleUsados,
-      fallecimientoPrimeraLineaTotal: emp.fallecimientoPrimeraLineaTotal,
-      fallecimientoPrimeraLineaUsados: lutoUsados,
-      activo: emp.activo,
-      fechaBaja: emp.fechaBaja,
-      motivoBaja: emp.motivoBaja,
-    );
 
     await guardarEmpleado(actualizado);
   }
@@ -946,42 +1187,35 @@ class TalentoHumanoStore extends ChangeNotifier {
     notifyListeners();
     await _guardarLocal();
 
-    if (_supabaseActivo) {
-      try {
-        await Supabase.instance.client
-            .from('solicitudes')
-            .update({'estatus': 'CANCELADA'})
-            .eq('id', id);
-      } catch (_) {}
-    }
+    await _remoto(
+      (c) => c.from('solicitudes').update({'estatus': 'CANCELADA'}).eq('id', id),
+    );
   }
 
   Future<void> eliminarSolicitud(String id) async {
     _solicitudes.removeWhere((s) => s.id == id);
     notifyListeners();
     await _guardarLocal();
-
-    if (_supabaseActivo) {
-      try {
-        await Supabase.instance.client
-            .from('solicitudes')
-            .delete()
-            .eq('id', id);
-      } catch (_) {}
-    }
+    await _remoto((c) => c.from('solicitudes').delete().eq('id', id));
   }
+
+  // ---------------------------------------------------------------------------
+  // Incidencias (AdministradorRH "registra")
+  // ---------------------------------------------------------------------------
 
   Future<void> agregarIncidencia(RegistroIncidencia incidencia) async {
     _incidencias.insert(0, incidencia);
     notifyListeners();
     await _guardarLocal();
+    await _remoto((c) => c.from('incidencias').insert(incidencia.toMap()));
 
-    if (_supabaseActivo) {
-      try {
-        await Supabase.instance.client
-            .from('incidencias')
-            .insert(incidencia.toMap());
-      } catch (_) {}
+    final emp = buscarEmpleadoPorNombre(incidencia.nombreEmpleado);
+    if (emp != null) {
+      await enviarNotificacion(
+        idEmpleado: emp.id,
+        mensaje:
+            'Se registró un(a) ${incidencia.tipo.toLowerCase()} a tu nombre: ${incidencia.titulo}.',
+      );
     }
   }
 
@@ -989,57 +1223,380 @@ class TalentoHumanoStore extends ChangeNotifier {
     _incidencias.removeWhere((i) => i.id == id);
     notifyListeners();
     await _guardarLocal();
+    await _remoto((c) => c.from('incidencias').delete().eq('id', id));
+  }
 
-    if (_supabaseActivo) {
-      try {
-        await Supabase.instance.client
-            .from('incidencias')
-            .delete()
-            .eq('id', id);
-      } catch (_) {}
+  // ---------------------------------------------------------------------------
+  // Departamentos y puestos
+  // ---------------------------------------------------------------------------
+
+  Future<void> guardarDepartamento(Departamento d) async {
+    final idx = _departamentos.indexWhere((x) => x.id == d.id);
+    if (idx >= 0) {
+      _departamentos[idx] = d;
+    } else {
+      _departamentos.add(d);
+    }
+    notifyListeners();
+    await _guardarLocal();
+    await _remoto((c) => c.from('departamentos').upsert(d.toMap()));
+  }
+
+  Future<void> crearDepartamento(String nombre) =>
+      guardarDepartamento(Departamento(id: _nuevoId('dep'), nombre: nombre.trim()));
+
+  /// Devuelve un mensaje de error si no se puede eliminar.
+  Future<String?> eliminarDepartamento(String id) async {
+    final n = empleadosDeDepartamento(id).length;
+    if (n > 0) {
+      return 'No se puede eliminar: tiene $n colaborador(es) asignado(s).';
+    }
+    _departamentos.removeWhere((d) => d.id == id);
+    notifyListeners();
+    await _guardarLocal();
+    await _remoto((c) => c.from('departamentos').delete().eq('id', id));
+    return null;
+  }
+
+  Future<void> guardarPuesto(Puesto p) async {
+    final idx = _puestos.indexWhere((x) => x.id == p.id);
+    if (idx >= 0) {
+      _puestos[idx] = p;
+    } else {
+      _puestos.add(p);
+    }
+    notifyListeners();
+    await _guardarLocal();
+    await _remoto((c) => c.from('puestos').upsert(p.toMap()));
+
+    // Si se renombró, actualiza el texto del puesto en los empleados.
+    for (final e in empleadosDePuesto(p.id)) {
+      if (e.puesto != p.nombre) {
+        await guardarEmpleado(e.copyWith(puesto: p.nombre));
+      }
     }
   }
+
+  Future<void> crearPuesto(String nombre) =>
+      guardarPuesto(Puesto(id: _nuevoId('pue'), nombre: nombre.trim()));
+
+  Future<String?> eliminarPuesto(String id) async {
+    final n = empleadosDePuesto(id).length;
+    if (n > 0) {
+      return 'No se puede eliminar: tiene $n colaborador(es) asignado(s).';
+    }
+    _puestos.removeWhere((p) => p.id == id);
+    notifyListeners();
+    await _guardarLocal();
+    await _remoto((c) => c.from('puestos').delete().eq('id', id));
+    return null;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Calendario laboral
+  // ---------------------------------------------------------------------------
+
+  Future<void> guardarDiaCalendario(DiaCalendario dia) async {
+    final idx = _calendario.indexWhere((x) => x.id == dia.id);
+    if (idx >= 0) {
+      _calendario[idx] = dia;
+    } else {
+      _calendario.add(dia);
+    }
+    notifyListeners();
+    await _guardarLocal();
+    await _remoto((c) => c.from('calendario_laboral').upsert(dia.toMap()));
+  }
+
+  Future<void> agregarDiaFestivo(DateTime fecha, String descripcion,
+          {bool esFestivo = true}) =>
+      guardarDiaCalendario(
+        DiaCalendario(
+          id: _nuevoId('dia'),
+          fecha: fecha,
+          descripcion: descripcion.trim(),
+          esFestivo: esFestivo,
+        ),
+      );
+
+  Future<void> eliminarDiaCalendario(String id) async {
+    _calendario.removeWhere((d) => d.id == id);
+    notifyListeners();
+    await _guardarLocal();
+    await _remoto((c) => c.from('calendario_laboral').delete().eq('id', id));
+  }
+
+  /// Carga los días de descanso obligatorio de la LFT (art. 74) del año dado
+  /// que aún no estén registrados.
+  Future<int> cargarFestivosOficiales(int anio) async {
+    DateTime nLunes(int mes, int n) {
+      var d = DateTime(anio, mes, 1);
+      while (d.weekday != DateTime.monday) {
+        d = DateTime(d.year, d.month, d.day + 1);
+      }
+      return DateTime(d.year, d.month, d.day + 7 * (n - 1));
+    }
+
+    final oficiales = <DateTime, String>{
+      DateTime(anio, 1, 1): 'Año Nuevo',
+      nLunes(2, 1): 'Día de la Constitución',
+      nLunes(3, 3): 'Natalicio de Benito Juárez',
+      DateTime(anio, 5, 1): 'Día del Trabajo',
+      DateTime(anio, 9, 16): 'Día de la Independencia',
+      nLunes(11, 3): 'Día de la Revolución',
+      DateTime(anio, 12, 25): 'Navidad',
+    };
+
+    var agregados = 0;
+    for (final entry in oficiales.entries) {
+      if (calendarioLaboral.esFestivo(entry.key)) continue;
+      await agregarDiaFestivo(entry.key, entry.value);
+      agregados++;
+    }
+    return agregados;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Notificaciones (Empleado / AdministradorRH "recibe")
+  // ---------------------------------------------------------------------------
+
+  List<Notificacion> notificacionesDe(String? idEmpleado) {
+    final lista = _notificaciones
+        .where((n) => idEmpleado == null ? n.esParaRH : n.idEmpleado == idEmpleado)
+        .toList()
+      ..sort((a, b) => b.fechaEnvio.compareTo(a.fechaEnvio));
+    return lista;
+  }
+
+  List<Notificacion> get notificacionesRH => notificacionesDe(null);
+
+  int noLeidasDe(String? idEmpleado) =>
+      notificacionesDe(idEmpleado).where((n) => !n.leida).length;
+
+  Future<void> enviarNotificacion({
+    required String? idEmpleado,
+    required String mensaje,
+  }) async {
+    final n = Notificacion(
+      id: _nuevoId('not'),
+      idEmpleado: idEmpleado,
+      mensaje: mensaje,
+    );
+    _notificaciones.insert(0, n);
+    notifyListeners();
+    await _guardarLocal();
+    await _remoto((c) => c.from('notificaciones').insert(n.toMap()));
+  }
+
+  Future<void> marcarNotificacionLeida(String id) async {
+    final idx = _notificaciones.indexWhere((n) => n.id == id);
+    if (idx == -1 || _notificaciones[idx].leida) return;
+    _notificaciones[idx] = _notificaciones[idx].marcarLeida();
+    notifyListeners();
+    await _guardarLocal();
+    await _remoto(
+      (c) => c.from('notificaciones').update({'leida': true}).eq('id', id),
+    );
+  }
+
+  Future<void> marcarTodasLeidas(String? idEmpleado) async {
+    for (final n in notificacionesDe(idEmpleado).where((n) => !n.leida)) {
+      await marcarNotificacionLeida(n.id);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Reportes (AdministradorRH "genera")
+  // ---------------------------------------------------------------------------
+
+  bool _enRango(DateTime f, DateTime? desde, DateTime? hasta) {
+    final d = DateTime(f.year, f.month, f.day);
+    if (desde != null &&
+        d.isBefore(DateTime(desde.year, desde.month, desde.day))) {
+      return false;
+    }
+    if (hasta != null &&
+        d.isAfter(DateTime(hasta.year, hasta.month, hasta.day))) {
+      return false;
+    }
+    return true;
+  }
+
+  /// Construye el contenido de un reporte sin guardarlo (útil para pruebas).
+  String construirContenidoReporte(
+    String tipo, {
+    DateTime? desde,
+    DateTime? hasta,
+    String? departamentoId,
+  }) {
+    bool deDepto(Empleado e) =>
+        departamentoId == null || e.departamentoId == departamentoId;
+    final sb = StringBuffer();
+
+    switch (tipo) {
+      case TiposReporte.plantilla:
+        final lista1 = empleadosActivos.where(deDepto).toList()
+          ..sort((a, b) => a.nombre.compareTo(b.nombre));
+        sb.writeln('Colaboradores activos: ${lista1.length}');
+        for (final e in lista1) {
+          sb.writeln(
+            '• ${e.numeroEmpleado} ${e.nombre} — ${e.puesto} — '
+            '${nombreDepartamento(e.departamentoId)} — '
+            '${e.estadoLaboral.etiqueta} — ${e.antiguedadTexto}',
+          );
+        }
+        break;
+      case TiposReporte.bajas:
+        final lista2 = empleadosBaja
+            .where(deDepto)
+            .where((e) => e.fechaBaja == null || _enRango(e.fechaBaja!, desde, hasta))
+            .toList();
+        sb.writeln('Bajas en el periodo: ${lista2.length}');
+        for (final e in lista2) {
+          sb.writeln(
+            '• ${e.numeroEmpleado} ${e.nombre} — '
+            '${e.fechaBaja == null ? 's/f' : fmtFecha(e.fechaBaja!)} — '
+            '${e.motivoBaja.isEmpty ? 'Sin motivo' : e.motivoBaja}',
+          );
+        }
+        break;
+      case TiposReporte.solicitudes:
+        final lista3 = _solicitudes.where((s) {
+          final emp = buscarEmpleadoPorId(s.idEmpleado);
+          if (departamentoId != null &&
+              (emp == null || emp.departamentoId != departamentoId)) {
+            return false;
+          }
+          return _enRango(s.fechaInicio, desde, hasta);
+        }).toList();
+        final porEstatus = <String, int>{};
+        for (final s in lista3) {
+          porEstatus[s.estatus] = (porEstatus[s.estatus] ?? 0) + 1;
+        }
+        sb.writeln('Solicitudes: ${lista3.length}');
+        porEstatus.forEach((k, v) => sb.writeln('  $k: $v'));
+        for (final s in lista3) {
+          sb.writeln(
+            '• ${s.nombreEmpleado} — ${s.tipo} — ${s.diasSolicitados} día(s) — '
+            '${fmtFecha(s.fechaInicio)} — ${s.estatus}',
+          );
+        }
+        break;
+      case TiposReporte.vacaciones:
+        final lista4 = empleadosActivos.where(deDepto).toList()
+          ..sort((a, b) => a.nombre.compareTo(b.nombre));
+        sb.writeln('Saldos de vacaciones (${lista4.length} colaboradores)');
+        for (final e in lista4) {
+          sb.writeln(
+            '• ${e.nombre}: usados ${e.diasVacacionesUsados} / '
+            '${e.diasVacacionesTotales}, disponibles ${e.diasVacacionesDisponibles} '
+            '(tabulador: ${e.diasVacacionesPorTabulador})',
+          );
+        }
+        break;
+      case TiposReporte.incidencias:
+        final lista5 = _incidencias.where((i) {
+          if (departamentoId != null) {
+            final emp = buscarEmpleadoPorNombre(i.nombreEmpleado);
+            if (emp == null || emp.departamentoId != departamentoId) {
+              return false;
+            }
+          }
+          return _enRango(i.fecha, desde, hasta);
+        }).toList();
+        final rec = lista5.where((i) => i.tipo == 'Reconocimiento').length;
+        sb.writeln('Incidencias: ${lista5.length} '
+            '(reconocimientos: $rec, sanciones: ${lista5.length - rec})');
+        for (final i in lista5) {
+          sb.writeln('• ${fmtFecha(i.fecha)} — ${i.nombreEmpleado} — '
+              '${i.tipo}: ${i.titulo}');
+        }
+        break;
+      default:
+        sb.writeln('Tipo de reporte no reconocido: $tipo');
+    }
+    return sb.toString().trimRight();
+  }
+
+  Future<Reporte> generarReporte(
+    String tipo, {
+    DateTime? desde,
+    DateTime? hasta,
+    String? departamentoId,
+  }) async {
+    final params = <String, dynamic>{
+      if (desde != null) 'desde': desde.toIso8601String(),
+      if (hasta != null) 'hasta': hasta.toIso8601String(),
+      'departamento_id': ?departamentoId,
+    };
+    final reporte = Reporte(
+      id: _nuevoId('rep'),
+      tipoReporte: tipo,
+      descripcion: construirContenidoReporte(
+        tipo,
+        desde: desde,
+        hasta: hasta,
+        departamentoId: departamentoId,
+      ),
+      parametros: jsonEncode(params),
+      generadoPor: administradorActual?.id,
+    );
+    _reportes.insert(0, reporte);
+    notifyListeners();
+    await _guardarLocal();
+    await _remoto((c) => c.from('reportes').insert(reporte.toMap()));
+    return reporte;
+  }
+
+  Future<void> eliminarReporte(String id) async {
+    _reportes.removeWhere((r) => r.id == id);
+    notifyListeners();
+    await _guardarLocal();
+    await _remoto((c) => c.from('reportes').delete().eq('id', id));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Ciclo anual
+  // ---------------------------------------------------------------------------
 
   Future<void> reiniciarSaldosCicloAnual() async {
     final nuevaVigencia = finCicloAnual();
     for (int i = 0; i < _empleados.length; i++) {
-      final emp = _empleados[i];
-      _empleados[i] = Empleado(
-        id: emp.id,
-        nombre: emp.nombre,
-        puesto: emp.puesto,
-        fechaIngreso: emp.fechaIngreso,
-        fechaNacimiento: emp.fechaNacimiento,
-        vecesVacacionesAnio: emp.vecesVacacionesAnio,
-        diasPorPeriodoVacaciones: emp.diasPorPeriodoVacaciones,
+      _empleados[i] = _empleados[i].copyWith(
         diasVacacionesUsados: 0,
         vigenciaVacaciones: nuevaVigencia,
-        permisosEntradaTardeTotal: emp.permisosEntradaTardeTotal,
         permisosEntradaTardeUsados: 0,
-        permisosSalidaAntesTotal: emp.permisosSalidaAntesTotal,
         permisosSalidaAntesUsados: 0,
-        faltasConGoceTotal: emp.faltasConGoceTotal,
         faltasConGoceUsados: 0,
-        faltasSinGoceTotal: emp.faltasSinGoceTotal,
         faltasSinGoceUsados: 0,
-        diaCumpleanosTotal: emp.diaCumpleanosTotal,
         diaCumpleanosUsados: 0,
-        fallecimientoPrimeraLineaTotal: emp.fallecimientoPrimeraLineaTotal,
         fallecimientoPrimeraLineaUsados: 0,
-        activo: emp.activo,
-        fechaBaja: emp.fechaBaja,
-        motivoBaja: emp.motivoBaja,
       );
     }
     notifyListeners();
     await _guardarLocal();
 
-    if (_supabaseActivo) {
-      try {
-        for (final emp in _empleados) {
-          await Supabase.instance.client.from('empleados').upsert(emp.toMap());
-        }
-      } catch (_) {}
-    }
+    await _remoto((c) async {
+      for (final emp in _empleados) {
+        await _upsertEmpleado(c, emp);
+      }
+    });
+  }
+
+  /// Solo para pruebas: limpia el estado en memoria.
+  @visibleForTesting
+  void reiniciarParaPruebas() {
+    _empleados.clear();
+    _usuarios.clear();
+    _solicitudes.clear();
+    _incidencias.clear();
+    _departamentos.clear();
+    _puestos.clear();
+    _notificaciones.clear();
+    _calendario.clear();
+    _reportes.clear();
+    _empleadoActualId = null;
+    _usuarioActualId = null;
+    _rolActual = null;
   }
 }

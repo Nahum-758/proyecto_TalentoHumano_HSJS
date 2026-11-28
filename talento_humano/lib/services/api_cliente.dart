@@ -238,4 +238,97 @@ class ApiCliente {
     );
     return _procesarRespuesta(res);
   }
+
+  // ---------------------------------------------------------------------------
+  // Entidades del diagrama: departamentos, puestos, notificaciones,
+  // calendario laboral y reportes.
+  // ---------------------------------------------------------------------------
+
+  static const Map<String, String> _json = {'Content-Type': 'application/json'};
+
+  Future<JsonMap> _get(String ruta, [Map<String, String>? query]) async {
+    final uri = query == null || query.isEmpty
+        ? _uri(ruta)
+        : _uri(ruta).replace(queryParameters: query);
+    return _procesarRespuesta(await http.get(uri));
+  }
+
+  Future<JsonMap> _post(String ruta, [JsonMap? body]) async =>
+      _procesarRespuesta(
+        await http.post(_uri(ruta), headers: _json, body: jsonEncode(body ?? {})),
+      );
+
+  Future<JsonMap> _patch(String ruta, [JsonMap? body]) async =>
+      _procesarRespuesta(
+        await http.patch(_uri(ruta), headers: _json, body: jsonEncode(body ?? {})),
+      );
+
+  Future<JsonMap> _delete(String ruta) async =>
+      _procesarRespuesta(await http.delete(_uri(ruta)));
+
+  Future<JsonMap> listarDepartamentos() => _get('/departamentos');
+  Future<JsonMap> crearDepartamento(String nombre) =>
+      _post('/departamentos', {'nombre': nombre});
+  Future<JsonMap> renombrarDepartamento(String id, String nombre) =>
+      _patch('/departamentos/$id', {'nombre': nombre});
+  Future<JsonMap> eliminarDepartamento(String id) =>
+      _delete('/departamentos/$id');
+
+  Future<JsonMap> listarPuestos() => _get('/puestos');
+  Future<JsonMap> crearPuesto(String nombre) =>
+      _post('/puestos', {'nombre': nombre});
+  Future<JsonMap> renombrarPuesto(String id, String nombre) =>
+      _patch('/puestos/$id', {'nombre': nombre});
+  Future<JsonMap> eliminarPuesto(String id) => _delete('/puestos/$id');
+
+  /// [idEmpleado] null = notificaciones de RH.
+  Future<JsonMap> listarNotificaciones({
+    String? idEmpleado,
+    bool soloNoLeidas = false,
+  }) =>
+      _get('/notificaciones', {
+        'idEmpleado': ?idEmpleado,
+        if (soloNoLeidas) 'soloNoLeidas': 'true',
+      });
+  Future<JsonMap> marcarNotificacionLeida(String id) =>
+      _patch('/notificaciones/$id/leida');
+
+  Future<JsonMap> listarCalendario({int? anio}) =>
+      _get('/calendario', {if (anio != null) 'anio': '$anio'});
+  Future<JsonMap> agregarDiaCalendario({
+    required DateTime fecha,
+    required String descripcion,
+    bool esFestivo = true,
+  }) =>
+      _post('/calendario', {
+        'fecha': fecha.toIso8601String(),
+        'descripcion': descripcion,
+        'esFestivo': esFestivo,
+      });
+  Future<JsonMap> eliminarDiaCalendario(String idDia) =>
+      _delete('/calendario/$idDia');
+  Future<JsonMap> cargarFestivosOficiales(int anio) =>
+      _post('/calendario/festivos-oficiales/$anio');
+  Future<JsonMap> diasHabiles(DateTime inicio, DateTime fin) =>
+      _get('/calendario/dias-habiles', {
+        'inicio': inicio.toIso8601String(),
+        'fin': fin.toIso8601String(),
+      });
+
+  Future<JsonMap> listarReportes() => _get('/reportes');
+  Future<JsonMap> obtenerReporte(String id) => _get('/reportes/$id');
+
+  /// [tipoReporte]: PLANTILLA | BAJAS | SOLICITUDES | VACACIONES | INCIDENCIAS
+  Future<JsonMap> generarReporte({
+    required String tipoReporte,
+    DateTime? desde,
+    DateTime? hasta,
+    String? idDepartamento,
+  }) =>
+      _post('/reportes', {
+        'tipoReporte': tipoReporte,
+        if (desde != null) 'desde': desde.toIso8601String(),
+        if (hasta != null) 'hasta': hasta.toIso8601String(),
+        'idDepartamento': ?idDepartamento,
+      });
 }
